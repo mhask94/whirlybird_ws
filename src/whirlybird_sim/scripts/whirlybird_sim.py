@@ -132,14 +132,14 @@ class WhirlybirdSim():
 
     def dynamics(self, state, command):
         # Get parameters of ros param server
-        g  = self.g 
+        g  = self.g
         l1 = self.l1
         l2 = self.l2
         m1 = self.m1
         m2 = self.m2
-        d  = self.d 
-        h  = self.h 
-        r  = self.r 
+        d  = self.d
+        h  = self.h
+        r  = self.r
         Jx = self.Jx
         Jy = self.Jy
         Jz = self.Jz
@@ -171,7 +171,27 @@ class WhirlybirdSim():
 
         ################################################
         # Implement Dynamics for Accelerations Here    #
+        M = np.array([
+            [Jx,0.0,-Jx*stheta],
+            [0.0,m1*l1*l1+m2*l2*l2+Jy*cphi**2+Jz*sphi**2,(Jy-Jz)*sphi*cphi*ctheta],
+            [-Jx*stheta,(Jy-Jz)*sphi*cphi*ctheta,(m1*l1*l1+m2*l2*l2+Jy*sphi+Jz*cphi)*ctheta**2+Jx*stheta**2]])
 
+        c = np.array([
+            -thetad**2*(Jz-Jy)*sphi*cphi+psid**2*(Jz-Jy)*sphi*cphi*ctheta**2-thetad*psid*ctheta*(Jx-(Jz-Jy)*(cphi**2-sphi**2)),
+            psid**2*stheta*ctheta*(-Jx+m1*l1*l1+m2*l2*l2+Jy*sphi**2+Jz*cphi**2)-2*phid*thetad*(Jz-Jy)*sphi*cphi-phid*psid*ctheta*(-Jx+(Jz-Jy)*(cphi**2-sphi**2)),
+            thetad**2*(Jz-Jy)*sphi*cphi*stheta-phid*thetad*ctheta*(Jx+(Jz-Jy)*(ctheta**2-stheta**2))-2*phid*psid*(Jz-Jy)*ctheta**2*sphi*cphi+2*thetad*psid*stheta*ctheta*(Jx-m1*l1*l1-m2*l2*l2-Jy*sphi**2-Jz*cphi**2)
+        ])
+
+        dPdq = np.array([0.0,(m1*l1-m2*l2)*g*ctheta,0.0])
+
+        Q = np.array([d*(fl-fr),l1*(fl+fr)*cphi,l1*(fl+fr)*ctheta*sphi+d*(fr-fl)*stheta])
+
+        b = Q-dPdq-c
+        qddot = np.linalg.solve(M,b)
+
+        phiddot = qddot[0]
+        thetaddot = qddot[1]
+        psiddot = qddot[2]
 
         ################################################
 
@@ -187,7 +207,7 @@ class WhirlybirdSim():
         psi = self.state[2]
 
         # accelerometer
-        accel = np.zeros((3,1)) 
+        accel = np.zeros((3,1))
 
         # rate gyro
         B = np.zeros((3,3))
@@ -198,7 +218,7 @@ class WhirlybirdSim():
         B[2,1] = -np.sin(phi)
         B[2,2] = np.cos(phi)*np.cos(theta)
 
-        gyro = B.dot(self.state[3:6]) 
+        gyro = B.dot(self.state[3:6])
         return (accel, gyro)
 
     def sat(x, max, min):
