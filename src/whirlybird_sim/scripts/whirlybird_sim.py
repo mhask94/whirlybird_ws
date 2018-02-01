@@ -174,15 +174,15 @@ class WhirlybirdSim():
         M = np.array([
             [Jx,0.0,-Jx*stheta],
             [0.0,m1*l1*l1+m2*l2*l2+Jy*cphi**2+Jz*sphi**2,(Jy-Jz)*sphi*cphi*ctheta],
-            [-Jx*stheta,(Jy-Jz)*sphi*cphi*ctheta,(m1*l1*l1+m2*l2*l2+Jy*sphi+Jz*cphi)*ctheta**2+Jx*stheta**2]])
+            [-Jx*stheta,(Jy-Jz)*sphi*cphi*ctheta,(m1*l1*l1+m2*l2*l2+Jy*sphi**2+Jz*cphi**2)*ctheta**2+Jx*stheta**2]])
 
         c = np.array([
             -thetad**2*(Jz-Jy)*sphi*cphi+psid**2*(Jz-Jy)*sphi*cphi*ctheta**2-thetad*psid*ctheta*(Jx-(Jz-Jy)*(cphi**2-sphi**2)),
             psid**2*stheta*ctheta*(-Jx+m1*l1*l1+m2*l2*l2+Jy*sphi**2+Jz*cphi**2)-2*phid*thetad*(Jz-Jy)*sphi*cphi-phid*psid*ctheta*(-Jx+(Jz-Jy)*(cphi**2-sphi**2)),
-            thetad**2*(Jz-Jy)*sphi*cphi*stheta-phid*thetad*ctheta*(Jx+(Jz-Jy)*(ctheta**2-stheta**2))-2*phid*psid*(Jz-Jy)*ctheta**2*sphi*cphi+2*thetad*psid*stheta*ctheta*(Jx-m1*l1*l1-m2*l2*l2-Jy*sphi**2-Jz*cphi**2)
+            thetad**2*(Jz-Jy)*sphi*cphi*stheta-phid*thetad*ctheta*(Jx+(Jz-Jy)*(cphi**2-sphi**2))-2*phid*psid*(Jz-Jy)*ctheta**2*sphi*cphi+2*thetad*psid*stheta*ctheta*(Jx-m1*l1*l1-m2*l2*l2-Jy*sphi**2-Jz*cphi**2)
         ])
 
-        dPdq = np.array([0.0,(m1*l1-m2*l2)*g*ctheta,0.0])
+        dPdq = np.array([[0.0],[(m1*l1-m2*l2)*g*ctheta],[0.0]])
 
         Q = np.array([d*(fl-fr),l1*(fl+fr)*cphi,l1*(fl+fr)*ctheta*sphi+d*(fr-fl)*stheta])
 
@@ -192,6 +192,8 @@ class WhirlybirdSim():
         phiddot = qddot[0]
         thetaddot = qddot[1]
         psiddot = qddot[2]
+
+        xdot[3:6] = np.array([phiddot,thetaddot,psiddot])
 
         ################################################
 
