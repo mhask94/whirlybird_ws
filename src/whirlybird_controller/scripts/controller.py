@@ -41,6 +41,12 @@ class Controller():
         Jy = self.param['Jy']
         Jz = self.param['Jz']
         km = self.param['km']
+        b0 = 1.152
+
+        # tune gains for phi
+        tr_phi = 1.270170592217177
+        Wn_phi = 2.2 / tr_phi
+        h_phi = 1.1547
 
 
         # Roll Gains
@@ -52,9 +58,9 @@ class Controller():
 
         # Pitch Gains
         self.theta_r = 0.0
-        self.P_theta_ = 0.0
+        self.P_theta_ = Wn_phi**2/b0
         self.I_theta_ = 0.0
-        self.D_theta_ = 0.0
+        self.D_theta_ = 2.0*h_phi*Wn_phi/b0
         self.prev_theta = 0.0
         self.Int_theta = 0.0
 
@@ -68,7 +74,7 @@ class Controller():
 
         self.prev_time = rospy.Time.now()
 
-        self.Fe = 0.0 #Note this is not the correct value for Fe, you will have to find that yourself
+        self.Fe = g/l1*(m1*l1-m2*l2) #I imputed this line and have not checked it
 
         self.command_sub_ = rospy.Subscriber('whirlybird', Whirlybird, self.whirlybirdCallback, queue_size=5)
         self.psi_r_sub_ = rospy.Subscriber('psi_r', Float32, self.psiRCallback, queue_size=5)
@@ -109,25 +115,27 @@ class Controller():
         now = rospy.Time.now()
         dt = (now-self.prev_time).to_sec()
         self.prev_time = now
-        
+
         ##################################
         # Implement your controller here
-
-
+        F_tilde = self.P_theta_*(self.theta_r-theta)-self.D_theta_*(theta-self.prev_theta)/dt
+        F = F_tilde + self.Fe
+        left_force = F / 2.0
+        right_force = F / 2.0
         ##################################
 
         # Scale Output
         l_out = left_force/km
         if(l_out < 0):
             l_out = 0
-        elif(l_out > 1.0):
-            l_out = 1.0
+        elif(l_out > 0.7):
+            l_out = 0.7 # saturate to 0.7
 
         r_out = right_force/km
         if(r_out < 0):
             r_out = 0
-        elif(r_out > 1.0):
-            r_out = 1.0
+        elif(r_out > 0.7):
+            r_out = 0.7 # saturate to 0.7
 
         # Pack up and send command
         command = Command()

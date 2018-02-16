@@ -189,9 +189,9 @@ class WhirlybirdSim():
         b = Q-dPdq-c
         qddot = np.linalg.solve(M,b)
 
-        phiddot = qddot[0]
+        phiddot = qddot[0]*0    # constrain lateral dynamics
         thetaddot = qddot[1]
-        psiddot = qddot[2]
+        psiddot = qddot[2]*0    # constrain lateral dynamics
 
         xdot[3:6] = np.array([phiddot,thetaddot,psiddot])
 
