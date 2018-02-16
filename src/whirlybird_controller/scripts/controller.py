@@ -43,10 +43,11 @@ class Controller():
         km = self.param['km']
         b0 = 1.152
 
+
         # tune gains for phi
-        tr_phi = 1.270170592217177
+        tr_phi = 1.0 #1.270170592217177
         Wn_phi = 2.2 / tr_phi
-        h_phi = 1.1547
+        h_phi = .707 #1.1547
 
 
         # Roll Gains
@@ -119,6 +120,7 @@ class Controller():
         ##################################
         # Implement your controller here
         F_tilde = self.P_theta_*(self.theta_r-theta)-self.D_theta_*(theta-self.prev_theta)/dt
+        self.prev_theta = theta
         F = F_tilde + self.Fe
         left_force = F / 2.0
         right_force = F / 2.0

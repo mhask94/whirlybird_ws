@@ -148,9 +148,9 @@ class WhirlybirdSim():
         phi = state[0]
         theta = state[1]
         psi = state[2]
-        phid = state[3]
+        phid = state[3] * 0 # constrain lateral dynamics
         thetad = state[4]
-        psid = state[5]
+        psid = state[5] * 0 # constrain lateral dynamics
 
         # adjust forces for gains
         fl = km * command[0]
@@ -160,6 +160,8 @@ class WhirlybirdSim():
 
         # angle dynamics
         xdot[0:3] = state[3:6]
+        xdot[0] = 0    # constrain lateral dynamics
+        xdot[2] = 0    # constrain lateral dynamics
 
         # angle rate dynamics
         sphi   = np.sin(phi)
