@@ -41,41 +41,52 @@ class Controller():
         Jy = self.param['Jy']
         Jz = self.param['Jz']
         km = self.param['km']
-        b0 = 1.152
+        Fe = g/l1*(m1*l1-m2*l2) 
+        b_psi = l1*Fe / (m1*l1**2+m2*l2**2+Jz)
+        b0 = l1 / (m1*l1**2+m2*l2**2+Jy)
 
 
         # tune gains for phi
-        tr_phi = 1.0 #1.270170592217177
+        tr_phi = 0.3 
         Wn_phi = 2.2 / tr_phi
-        h_phi = .707 #1.1547
+        h_phi = .7
 
+        # tune gains for theta
+        tr_theta = 1.4
+        Wn_theta = 2.2 / tr_theta
+        h_theta = .7
+
+        # tune gains for phi
+        tr_psi = 10 * tr_phi 
+        Wn_phi = 2.2 / tr_psi
+        h_psi = .7
 
         # Roll Gains
-        self.P_phi_ = 0.0
+        self.P_phi_ = Jx * Wn_phi**2
         self.I_phi_ = 0.0
-        self.D_phi_ = 0.0
+        self.D_phi_ = Jx*(2*h_phi*Wn_phi)
         self.Int_phi = 0.0
         self.prev_phi = 0.0
 
         # Pitch Gains
         self.theta_r = 0.0
-        self.P_theta_ = Wn_phi**2/b0
+        self.P_theta_ = Wn_theta**2/b0
         self.I_theta_ = 0.0
-        self.D_theta_ = 2.0*h_phi*Wn_phi/b0
+        self.D_theta_ = 2.0*h_theta*Wn_theta/b0
         self.prev_theta = 0.0
         self.Int_theta = 0.0
 
         # Yaw Gains
         self.psi_r = 0.0
-        self.P_psi_ = 0.0
+        self.P_psi_ = Wn_psi**2 / b_psi
         self.I_psi_ = 0.0
-        self.D_psi_ = 0.0
+        self.D_psi_ = 2*h_psi*Wn_psi / b_psi
         self.prev_psi = 0.0
         self.Int_psi = 0.0
 
         self.prev_time = rospy.Time.now()
 
-        self.Fe = g/l1*(m1*l1-m2*l2) #I imputed this line and have not checked it
+        self.Fe = Fe
 
         self.command_sub_ = rospy.Subscriber('whirlybird', Whirlybird, self.whirlybirdCallback, queue_size=5)
         self.psi_r_sub_ = rospy.Subscriber('psi_r', Float32, self.psiRCallback, queue_size=5)
@@ -119,11 +130,23 @@ class Controller():
 
         ##################################
         # Implement your controller here
+
+        # Calculate force
         F_tilde = self.P_theta_*(self.theta_r-theta)-self.D_theta_*(theta-self.prev_theta)/dt
-        self.prev_theta = theta
         F = F_tilde + self.Fe
-        left_force = F / 2.0
-        right_force = F / 2.0
+
+        # Calculate torque, remember that Tau_equilibrium = 0 so Tau = Tau_tilde
+        phi_c = (self.P_psi_*(self.psi_r-psi)-self.D_psi_*(psi-self.prev_psi)/dt)
+        Tau = self.P_phi_*(phi-phi_c)-self.D_phi_*(phi-self.prev_phi)/dt
+
+        # Update states
+        self.prev_theta = theta
+        self.prev_psi = psi
+        self.prev_phi = phi
+
+        # Calculate Fl and Fr
+        left_force  = (F + Tau/d) / (2.0*km)
+        right_force = (F - Tau/d) / (2.0*km)
         ##################################
 
         # Scale Output
