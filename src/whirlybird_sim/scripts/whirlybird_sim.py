@@ -145,12 +145,12 @@ class WhirlybirdSim():
         Jz = self.Jz
         km = self.km
 
-        phi = state[0]
-        theta = state[1]
-        psi = state[2]
-        phid = state[3]
+        phi    = state[0]
+        theta  = state[1]
+        psi    = state[2]
+        phid   = state[3]
         thetad = state[4]
-        psid = state[5]
+        psid   = state[5]
 
         # adjust forces for gains
         fl = km * command[0]
@@ -189,11 +189,12 @@ class WhirlybirdSim():
         b = Q-dPdq-c
         qddot = np.linalg.solve(M,b)
 
-        phiddot = qddot[0]
+        phiddot   = qddot[0]
         thetaddot = qddot[1]
-        psiddot = qddot[2]
+        psiddot   = qddot[2]
 
         xdot[3:6] = np.array([phiddot,thetaddot,psiddot])
+
 
         ################################################
 
@@ -204,9 +205,9 @@ class WhirlybirdSim():
 
     def imu(self):
         # imu data is not used in ECEn 483
-        phi = self.state[0]
+        phi   = self.state[0]
         theta = self.state[1]
-        psi = self.state[2]
+        psi   = self.state[2]
 
         # accelerometer
         accel = np.zeros((3,1))

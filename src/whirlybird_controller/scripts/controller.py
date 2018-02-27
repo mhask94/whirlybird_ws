@@ -41,24 +41,24 @@ class Controller():
         Jy = self.param['Jy']
         Jz = self.param['Jz']
         km = self.param['km']
-        Fe = g/l1*(m1*l1-m2*l2) 
+        Fe = g/l1*(m1*l1-m2*l2)
         b_psi = l1*Fe / (m1*l1**2+m2*l2**2+Jz)
         b0 = l1 / (m1*l1**2+m2*l2**2+Jy)
 
 
         # tune gains for phi
-        tr_phi = 0.3 
+        tr_phi = 0.3
         Wn_phi = 2.2 / tr_phi
         h_phi = .7
 
         # tune gains for theta
         tr_theta = 1.4
         Wn_theta = 2.2 / tr_theta
-        h_theta = .7
+        h_theta = .707
 
-        # tune gains for phi
-        tr_psi = 10 * tr_phi 
-        Wn_phi = 2.2 / tr_psi
+        # tune gains for psi
+        tr_psi = 4.5 * tr_phi
+        Wn_psi = 2.2 / tr_psi
         h_psi = .7
 
         # Roll Gains
@@ -84,9 +84,11 @@ class Controller():
         self.prev_psi = 0.0
         self.Int_psi = 0.0
 
+
         self.prev_time = rospy.Time.now()
 
         self.Fe = Fe
+
 
         self.command_sub_ = rospy.Subscriber('whirlybird', Whirlybird, self.whirlybirdCallback, queue_size=5)
         self.psi_r_sub_ = rospy.Subscriber('psi_r', Float32, self.psiRCallback, queue_size=5)
@@ -136,8 +138,8 @@ class Controller():
         F = F_tilde + self.Fe
 
         # Calculate torque, remember that Tau_equilibrium = 0 so Tau = Tau_tilde
-        phi_c = (self.P_psi_*(self.psi_r-psi)-self.D_psi_*(psi-self.prev_psi)/dt)
-        Tau = self.P_phi_*(phi-phi_c)-self.D_phi_*(phi-self.prev_phi)/dt
+        phi_c = self.P_psi_*(self.psi_r-psi)-self.D_psi_*(psi-self.prev_psi)/dt
+        Tau = self.P_phi_*(phi_c-phi)-self.D_phi_*(phi-self.prev_phi)/dt
 
         # Update states
         self.prev_theta = theta
@@ -145,8 +147,8 @@ class Controller():
         self.prev_phi = phi
 
         # Calculate Fl and Fr
-        left_force  = (F + Tau/d) / (2.0*km)
-        right_force = (F - Tau/d) / (2.0*km)
+        left_force  = (F + Tau/d) / 2.0
+        right_force = (F - Tau/d) / 2.0
         ##################################
 
         # Scale Output
