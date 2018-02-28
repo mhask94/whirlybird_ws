@@ -15,7 +15,7 @@ import time
 from whirlybird_msgs.msg import Command
 from whirlybird_msgs.msg import Whirlybird
 from std_msgs.msg import Float32
-
+import numpy as np
 
 class Controller():
 
@@ -135,7 +135,7 @@ class Controller():
 
         # Calculate force
         F_tilde = self.P_theta_*(self.theta_r-theta)-self.D_theta_*(theta-self.prev_theta)/dt
-        F = F_tilde + self.Fe
+        F = F_tilde + self.Fe*np.cos(theta) # update the equilibrium force with the current theta
 
         # Calculate torque, remember that Tau_equilibrium = 0 so Tau = Tau_tilde
         phi_c = self.P_psi_*(self.psi_r-psi)-self.D_psi_*(psi-self.prev_psi)/dt
