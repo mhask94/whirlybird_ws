@@ -23,13 +23,22 @@ class SSControl:
 
         A_lat = np.mat([[0,0,1,0],[0,0,0,1],[0,0,0,0],[C1,0,0,0]])
         B_lat = np.mat([[0],[0],[1.0/Jx],[0]])
-        C_lat = np.mat([[1.,0,0,0]])
+        C_lat = np.mat([[0,1,0,0]])
 
         C_ab_lat = ctrl.ctrb(A_lat,B_lat)
         rank_lat = np.linalg.matrix_rank(C_ab_lat)
-        print('lat rank = ',rank_lat)
+        # print('lat rank = ',rank_lat)
         if rank_lat != 4:
             print('Warning: Not Controllable')
+
+        A1_lat = np.mat([[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,0],[C1,0,0,0,0],[0,-1,0,0,0]])
+        B1_lat = np.mat([[0],[0],[1.0/Jx],[0],[0]])
+
+        lat1_poly = np.convolve(np.convolve([1,2*7.33*0.7,7.33**2],[1,2*.733*.7,.733**2]),[1,0.2])
+        p1_lat = np.roots(lat1_poly)
+
+        K1_lat = ctrl.place(A1_lat,B1_lat,p1_lat)
+        print(K1_lat[0,-1])
 
         A_lon = np.mat([[0,1],[0,0]])
         B_lon = np.mat([[0],[C2]])
@@ -37,7 +46,7 @@ class SSControl:
 
         C_ab_lon = ctrl.ctrb(A_lon,B_lon)
         rank_lon = np.linalg.matrix_rank(C_ab_lon)
-        print('lon rank = ',rank_lon)
+        # print('lon rank = ',rank_lon)
         if rank_lon != 2:
             print('Warning: Not Controllable')
 
@@ -53,27 +62,27 @@ class SSControl:
         self.x_lat_e = np.mat([[self.phi_e],[self.psi_e],[0],[0]])
         self.x_lon_e = np.mat([[self.theta_e],[0]])
 
-        R1 = -1.0
-        I1 = 1.0j
+        R1 = -1.2
+        I1 = 0.9j
         R2 = -1.5
-        I2 = 1.5j
+        I2 = 1.0j
         # p = np.array([[R1+I1],[R1-I1],[R2+I2],[R2-I2]])
         p_lat = [R1+I1,R1-I1,R2+I2,R2-I2]
         self.K_lat = ctrl.place(A_lat,B_lat,p_lat)
-        print(self.K_lat[0,:])
+        # print(self.K_lat[0,:])
 
         R = -1.0
         I = 1.0j
         # p = np.array([[R1+I1],[R1-I1],[R2+I2],[R2-I2]])
         p_lon = [R+I,R-I]
         self.K_lon = ctrl.place(A_lon,B_lon,p_lon)
-        print(self.K_lon[0,:])
+        # print(self.K_lon[0,:])
 
         self.kr_lat = -1.0 / (C_lat*np.linalg.inv(A_lat-B_lat*self.K_lat)*B_lat)
         self.kr_lon = -1.0 / (C_lon*np.linalg.inv(A_lon-B_lon*self.K_lon)*B_lon)
-        print('kr values:')
-        print(self.kr_lat[0,0])
-        print(self.kr_lon[0,0])
+        # print('kr values:')
+        # print(self.kr_lat[0,0])
+        # print(self.kr_lon[0,0])
 
 
 def main():

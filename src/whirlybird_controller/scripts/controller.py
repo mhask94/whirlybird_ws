@@ -47,28 +47,6 @@ class Controller():
         b0 = l1 / (m1*l1**2+m2*l2**2+Jy)
         # rospy.loginfo('d = ',d)
 
-        # Check for controllability
-        C1 = l1*Fe / (m1*l1**2+m2*l2**2+Jz)
-        C2 = l1 / (m1*l1**2+m2*l2**2+Jy)
-
-        A_lat = np.mat([[0,0,1,0],[0,0,0,1],[0,0,0,0],[C1,0,0,0]])
-        B_lat = np.mat([[0],[0],[1.0/Jx],[0]])
-
-        C_ab_lat = ctrl.ctrb(A_lat,B_lat)
-        rank_lat = np.linalg.matrix_rank(C_ab_lat)
-        rospy.logwarn('lat rank = %d',rank_lat)
-        if rank_lat != 4:
-            rospy.logwarn('Warning: Not Controllable')
-
-        A_lon = np.mat([[0,1],[0,0]])
-        B_lon = np.mat([[0],[C2]])
-
-        C_ab_lon = ctrl.ctrb(A_lon,B_lon)
-        rank_lon = np.linalg.matrix_rank(C_ab_lon)
-        rospy.logwarn('lon rank = %d',rank_lon)
-        if rank_lon != 2:
-            rospy.logwarn('Warning: Not Controllable')
-
         # state-space equilibrium values
         phi_e = 0.0
         theta_e = 0.0
@@ -88,6 +66,63 @@ class Controller():
         tr_psi = 10.0 * tr_phi
         Wn_psi = 2.2 / tr_psi
         h_psi = .7
+
+        # Check for controllability
+        C1 = l1*Fe / (m1*l1**2+m2*l2**2+Jz)
+        C2 = l1 / (m1*l1**2+m2*l2**2+Jy)
+
+        A_lat = np.mat([[0,0,1,0],[0,0,0,1],[0,0,0,0],[C1,0,0,0]])
+        B_lat = np.mat([[0],[0],[1.0/Jx],[0]])
+        C_lat = np.mat([[0,1,0,0]])
+
+        C_ab_lat = ctrl.ctrb(A_lat,B_lat)
+        rank_lat = np.linalg.matrix_rank(C_ab_lat)
+        rospy.logwarn('lat rank = %d',rank_lat)
+        if rank_lat != 4:
+            rospy.logwarn('Warning: Not Controllable')
+
+        A_lon = np.mat([[0,1],[0,0]])
+        B_lon = np.mat([[0],[C2]])
+        C_lon = np.mat([[1.,0]])
+
+        C_ab_lon = ctrl.ctrb(A_lon,B_lon)
+        rank_lon = np.linalg.matrix_rank(C_ab_lon)
+        rospy.logwarn('lon rank = %d',rank_lon)
+        if rank_lon != 2:
+            rospy.logwarn('Warning: Not Controllable')
+
+        lat_poly = np.convolve([1,2*Wn_phi*h_phi,Wn_phi**2],[1,2*Wn_psi*h_psi,Wn_psi**2])
+        p_lat = np.roots(lat_poly)
+        self.K_lat = ctrl.place(A_lat,B_lat,p_lat)
+        # print(self.K_lat[0,:])
+
+        p_lon = np.roots([1,2*Wn_theta*h_theta,Wn_theta**2])
+        self.K_lon = ctrl.place(A_lon,B_lon,p_lon)
+        # print(self.K_lon[0,:])
+
+        kr_lat = -1.0 / (C_lat*np.linalg.inv(A_lat-B_lat*self.K_lat)*B_lat)
+        kr_lon = -1.0 / (C_lon*np.linalg.inv(A_lon-B_lon*self.K_lon)*B_lon)
+        self.kr_lat = kr_lat[0,0]
+        self.kr_lon = kr_lon[0.0]
+
+        # state-space integrator
+        # A1_lat = np.mat([[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,0],[C1,0,0,0,0],[0,-1,0,0,0]])
+        # B1_lat = np.mat([[0],[0],[1.0/Jx],[0],[0]])
+        # lat1_poly = np.convolve(np.convolve([1,2*Wn_phi*h_phi,Wn_phi**2],[1,2*Wn_psi*h_psi,Wn_psi**2]),[1,0.2])
+        # p1_lat = np.roots(lat1_poly)
+        #
+        # K1_lat = ctrl.place(A1_lat,B1_lat,p1_lat)
+        # self.Ki_lat = K1_lat[0,0:-1]
+
+        A1_lon = np.mat([[0,1,0],[0,0,0],[-1.0,0,0]])
+        B1_lon = np.mat([[0],[C2],[0]])
+
+        lon1_poly = np.convolve([1,2*Wn_theta*h_theta,Wn_theta**2],[1,.35])
+        p1_lon = np.roots(lon1_poly)
+        K_lon = ctrl.place(A1_lon,B1_lon,p1_lon)
+        self.K_lon = K_lon[0,:-1]
+        self.ki_lon = K_lon[0,-1]
+
 
         # Roll Gains
         self.P_phi_ = Jx * Wn_phi**2
@@ -124,6 +159,9 @@ class Controller():
         self.In_phi_prev = 0.0
         self.In_psi_prev = 0.0
 
+        self.error_lon_d1 = 0.0
+        self.error_lat_d1 = 0.0
+
         self.Fe = Fe
 
         self.command_sub_ = rospy.Subscriber('whirlybird', Whirlybird, self.whirlybirdCallback, queue_size=5)
@@ -156,7 +194,7 @@ class Controller():
         Jy = self.param['Jy']
         Jz = self.param['Jz']
         km = self.param['km']
-        tau = .075
+
 
 
         phi = msg.roll
@@ -171,7 +209,84 @@ class Controller():
         ##################################
         # Implement your controller here
 
+        tau = .075
+        Dn_theta = (2*tau - dt)/(2*tau + dt) * self.Dn_theta_prev + (2/(2*tau+dt))*(theta-self.prev_theta)
+        Dn_phi = (2*tau - dt)/(2*tau + dt) * self.Dn_phi_prev + (2/(2*tau+dt))*(phi-self.prev_phi)
+        Dn_psi = (2*tau - dt)/(2*tau + dt) * self.Dn_psi_prev + (2/(2*tau+dt))*(psi-self.prev_psi)
+
+        self.Dn_theta_prev = Dn_theta
+        self.Dn_phi_prev = Dn_phi
+        self.Dn_psi_prev = Dn_psi
+        self.prev_theta = theta
+        self.prev_psi = psi
+        self.prev_phi = phi
+
+        error_lon = self.theta_r - theta
+        # error_lat = self.psi_r - psi
+
+        In_theta = self.In_theta_prev + (dt/2)*(error_lon + self.error_lon_d1)
+        # In_psi = self.In_psi_prev + (dt/2)*(error_lat + self.error_lat_d1)
+        self.In_theta_prev = In_theta
+        self.error_lon_d1 = error_lon
+        # self.In_psi_prev = In_psi
+
+        # state vector
+        x_lon = np.mat([[theta],[Dn_theta]])
+        x_lat = np.mat([[phi],[psi],[Dn_phi],[Dn_psi]])
+
+        F_tilde = -self.K_lon*x_lon + self.kr_lon*self.theta_r
+        Tau_tilde = -self.K_lat*x_lat + self.kr_lat*self.psi_r
+
+        # F_tilde = -self.K_lon*x_lon - self.ki_lon*self.In_theta
+        # Tau_tilde = -self.K_lat*x_lat - self.ki_lat*self.In_psi
+
+        F = self.Fe*np.cos(theta) + F_tilde[0,0]
+        Tau = Tau_tilde[0,0]
+
+        # this is for PID control
+        # F,Tau = self.PID(phi,theta,psi,dt)
+
+        # Calculate Fl and Fr
+        left_force  = (F + Tau/d) / 2.0
+        right_force = (F - Tau/d) / 2.0
+        ##################################
+
+        # Scale Output
+        l_out = left_force/km
+        if(l_out < 0):
+            l_out = 0
+        elif(l_out > 0.7):
+            l_out = 0.7 # saturate to 0.7
+
+        r_out = right_force/km
+        if(r_out < 0):
+            r_out = 0
+        elif(r_out > 0.7):
+            r_out = 0.7 # saturate to 0.7
+
+        # Anti-windup setup
+        # if not self.I_theta_ == 0:
+        #     F_sat = (l_out + r_out)*km
+        #     Tau_sat = km * (l_out - r_out)*d
+        #     In_theta += dt/self.I_theta_*(F_sat - F)
+        # if not self.ki_lon == 0:
+        #     F_sat = (l_out + r_out)*km
+        #     Tau_sat = km * (l_out - r_out)*d
+        #     In_theta += dt/self.ki_lon*(F_sat - F)
+
+        self.In_theta_prev = In_theta
+        # self.In_phi_prev = In_phi
+        # self.In_psi_prev = In_psi
+
+        # Pack up and send command
+        command = Command()
+        command.left_motor = l_out
+        command.right_motor = r_out
+        self.command_pub_.publish(command)
+
+    def PID(phi,theta,psi,dt):
         # Calculate Derivative
+        tau = .075
         Dn_theta = (2*tau - dt)/(2*tau + dt) * self.Dn_theta_prev + (2/(2*tau+dt))*(theta-self.prev_theta)
         Dn_phi = (2*tau - dt)/(2*tau + dt) * self.Dn_phi_prev + (2/(2*tau+dt))*(phi-self.prev_phi)
         Dn_psi = (2*tau - dt)/(2*tau + dt) * self.Dn_psi_prev + (2/(2*tau+dt))*(psi-self.prev_psi)
@@ -210,39 +325,7 @@ class Controller():
         self.En_phi_prev = En_phi
         self.En_psi_prev = En_psi
 
-        # Calculate Fl and Fr
-        left_force  = (F + Tau/d) / 2.0
-        right_force = (F - Tau/d) / 2.0
-        ##################################
-
-        # Scale Output
-        l_out = left_force/km
-        if(l_out < 0):
-            l_out = 0
-        elif(l_out > 0.7):
-            l_out = 0.7 # saturate to 0.7
-
-        r_out = right_force/km
-        if(r_out < 0):
-            r_out = 0
-        elif(r_out > 0.7):
-            r_out = 0.7 # saturate to 0.7
-
-        # Anti-windup setup
-        if not self.I_theta_ == 0:
-            F_sat = (l_out + r_out)*km
-            Tau_sat = km * (l_out - r_out)*d
-            In_theta += dt/self.I_theta_*(F_sat - F)
-
-        self.In_theta_prev = In_theta
-        self.In_phi_prev = In_phi
-        self.In_psi_prev = In_psi
-
-        # Pack up and send command
-        command = Command()
-        command.left_motor = l_out
-        command.right_motor = r_out
-        self.command_pub_.publish(command)
+        return F,Tau
 
 
 if __name__ == '__main__':
