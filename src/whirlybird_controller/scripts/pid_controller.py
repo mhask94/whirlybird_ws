@@ -16,7 +16,6 @@ from whirlybird_msgs.msg import Command
 from whirlybird_msgs.msg import Whirlybird
 from std_msgs.msg import Float32
 import numpy as np
-import control as ctrl
 
 class Controller():
 
@@ -47,32 +46,6 @@ class Controller():
         b0 = l1 / (m1*l1**2+m2*l2**2+Jy)
         # rospy.loginfo('d = ',d)
 
-        # Check for controllability
-        C1 = l1*Fe / (m1*l1**2+m2*l2**2+Jz)
-        C2 = l1 / (m1*l1**2+m2*l2**2+Jy)
-
-        A_lat = np.mat([[0,0,1,0],[0,0,0,1],[0,0,0,0],[C1,0,0,0]])
-        B_lat = np.mat([[0],[0],[1.0/Jx],[0]])
-
-        C_ab_lat = ctrl.ctrb(A_lat,B_lat)
-        rank_lat = np.linalg.matrix_rank(C_ab_lat)
-        rospy.logwarn('lat rank = %d',rank_lat)
-        if rank_lat != 4:
-            rospy.logwarn('Warning: Not Controllable')
-
-        A_lon = np.mat([[0,1],[0,0]])
-        B_lon = np.mat([[0],[C2]])
-
-        C_ab_lon = ctrl.ctrb(A_lon,B_lon)
-        rank_lon = np.linalg.matrix_rank(C_ab_lon)
-        rospy.logwarn('lon rank = %d',rank_lon)
-        if rank_lon != 2:
-            rospy.logwarn('Warning: Not Controllable')
-
-        # state-space equilibrium values
-        phi_e = 0.0
-        theta_e = 0.0
-        psi_e = 0.0
 
         # tune gains for phi
         tr_phi = 0.3
